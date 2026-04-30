@@ -109,11 +109,11 @@ pipeline {
                     docker rm   ${APP_NAME} || true
                     docker run -d \
                         --name ${APP_NAME} \
-                        -p 8080:8080 \
+                        -p 8081:8080 \
                         --restart unless-stopped \
                         ${IMAGE_TAG}
                 """
-                echo "==> Aplicación disponible en http://localhost:8080"
+                echo "==> Aplicación disponible en http://localhost:8081"
             }
         }
     }
