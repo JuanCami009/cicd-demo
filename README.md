@@ -16,8 +16,7 @@ Aplicación Spring Boot 2.1 usada como base para el ejercicio de diseño y const
   - [4. Configuración de Jenkins](#4-configuración-de-jenkins)
     - [4.1 Crear el job](#41-crear-el-job)
     - [4.2 Configurar Pipeline script from SCM](#42-configurar-pipeline-script-from-scm)
-    - [4.3 Configurar trigger automático (opcional)](#43-configurar-trigger-automático-opcional)
-    - [4.4 Primera ejecución](#44-primera-ejecución)
+    - [4.3 Primera ejecución](#43-primera-ejecución)
   - [5. Ejecución local (sin Docker)](#5-ejecución-local-sin-docker)
   - [6. Ejecución con Docker](#6-ejecución-con-docker)
   - [7. Despliegue en Kubernetes (Docker Desktop)](#7-despliegue-en-kubernetes-docker-desktop)
@@ -146,7 +145,9 @@ failure => mensaje de fallo con indicación de revisar logs
 
 1. En la pantalla principal de Jenkins, hacer clic en **New Item**
 2. Ingresar un nombre (ej. `cicd-demo`)
-3. Seleccionar **Pipeline** y hacer clic en **OK**
+3. Seleccionar **Multibranch Pipeline** y hacer clic en **OK**
+
+![New Item — Multibranch Pipeline](new-pipeline.jpeg)
 
 ### 4.2 Configurar Pipeline script from SCM
 
@@ -162,13 +163,9 @@ En la sección **Pipeline** del job:
 
 > Con esta configuración, Jenkins lee el `Jenkinsfile` directamente del repositorio cada vez que ejecuta el pipeline. No es necesario copiar el script en la UI.
 
-### 4.3 Configurar trigger automático (opcional)
+![Pipeline from SCM — configuración](new-pipeline-config.jpeg)
 
-En la sección **Build Triggers**:
-- Marcar **Poll SCM** con schedule `H/5 * * * *` (verifica cambios cada 5 min)
-- O usar **GitHub hook trigger** si tienes webhook configurado en el repositorio
-
-### 4.4 Primera ejecución
+### 4.3 Primera ejecución
 
 1. Hacer clic en **Build Now**
 2. En **Build History**, hacer clic en el número de build
@@ -186,6 +183,12 @@ En la sección **Build Triggers**:
 Successfully built <image-id>
 ==> Pipeline EXITOSO: cicd-demo compilado, probado y desplegado.
 ```
+
+![Stage View — pipeline exitoso](execution1.jpeg)
+
+![Console Output — BUILD SUCCESS y tests](console-output-1.jpeg)
+
+![Artifacts — JAR archivado](artifacts-1.jpeg)
 
 ---
 
@@ -269,6 +272,8 @@ kubectl apply -f k8s/service.yml
 
 ### 7.3 Verificar el despliegue
 
+![kubectl get pods — Pod Running](kubernetes-get-pods-1.jpeg)
+
 ```bash
 # Ver el estado del Deployment
 kubectl get deployments
@@ -290,6 +295,8 @@ kubectl logs deployment/cicd-demo
 ```
 
 ### 7.4 Acceder a la aplicación
+
+![Health check K8s — status UP](health-check-1.jpeg)
 
 Con Docker Desktop K8s, el nodo es `localhost`:
 
