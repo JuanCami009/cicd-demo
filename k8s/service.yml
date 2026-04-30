@@ -1,0 +1,44 @@
+# ============================================================
+# Kubernetes Service — cicd-demo (NodePort)
+#
+# Expone el Deployment 'cicd-demo' fuera del cluster mediante
+# un NodePort, permitiendo acceder a la aplicación desde el
+# host local en http://localhost:30080
+#
+# Tipo NodePort elegido porque:
+#   - Docker Desktop K8s no incluye LoadBalancer externo por defecto
+#   - Es la forma más sencilla de acceso local (kind, minikube, etc.)
+#   - No requiere Ingress Controller adicional
+#
+# Aplicar:
+#   kubectl apply -f k8s/service.yml
+#
+# Verificar:
+#   kubectl get svc cicd-demo-svc
+#   curl http://localhost:30080/actuator/health
+#   curl http://localhost:30080/users
+# ============================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: cicd-demo-svc
+  labels:
+    app: cicd-demo
+spec:
+  # NodePort: el tráfico externo entra por <nodo-ip>:<nodePort>
+  # y se redirige al puerto 8080 del contenedor.
+  type: NodePort
+  selector:
+    # Debe coincidir con los labels del Pod definidos en deployment.yml
+    app: cicd-demo
+  ports:
+    - name: http
+      protocol: TCP
+      # Puerto interno del Service dentro del cluster
+      port: 80
+      # Puerto del contenedor al que se reenvía el tráfico
+      targetPort: 8080
+      # Puerto externo fijo en el nodo (rango válido: 30000-32767)
+      # Acceso: http://localhost:30080
+      nodePort: 30080

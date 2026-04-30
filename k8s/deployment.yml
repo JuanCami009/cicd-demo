@@ -1,0 +1,84 @@
+# ============================================================
+# Kubernetes Deployment — cicd-demo
+#
+# Despliega la aplicación Spring Boot como un Pod gestionado
+# por un Deployment (garantiza re-inicio automático ante fallos).
+#
+# Prerequisitos:
+#   - Imagen construida localmente: docker build -t cicd-demo:latest .
+#   - Docker Desktop con Kubernetes habilitado
+#     (Docker Desktop > Settings > Kubernetes > Enable Kubernetes)
+#
+# Aplicar:
+#   kubectl apply -f k8s/deployment.yml
+#
+# Verificar:
+#   kubectl get pods
+#   kubectl describe pod <nombre-del-pod>
+#   kubectl logs <nombre-del-pod>
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-demo
+  labels:
+    app: cicd-demo
+    version: "latest"
+spec:
+  # Una sola réplica es suficiente para este demo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cicd-demo
+  template:
+    metadata:
+      labels:
+        app: cicd-demo
+    spec:
+      containers:
+        - name: cicd-demo
+          image: cicd-demo:latest
+          # IfNotPresent: usa la imagen local si existe, sin ir al registry.
+          # Docker Desktop comparte el daemon Docker con el cluster,
+          # por lo que las imágenes construidas con 'docker build' están
+          # disponibles directamente para Kubernetes sin push al registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # ----------------------------------------------------------
+          # Liveness Probe: Kubernetes reinicia el Pod si el endpoint
+          # no responde. Usa /actuator/health del Spring Boot Actuator.
+          # initialDelaySeconds: tiempo que tarda la JVM en arrancar.
+          # ----------------------------------------------------------
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # ----------------------------------------------------------
+          # Readiness Probe: Kubernetes no envía tráfico al Pod hasta
+          # que este endpoint responda OK. Más conservador que liveness.
+          # ----------------------------------------------------------
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            failureThreshold: 3
+
+          # Límites de recursos para el nodo del cluster local
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
