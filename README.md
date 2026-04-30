@@ -6,16 +6,33 @@ Aplicación Spring Boot 2.1 usada como base para el ejercicio de diseño y const
 
 ## Tabla de contenido
 
-1. [Descripción del proyecto](#1-descripción-del-proyecto)
-2. [Prerrequisitos](#2-prerrequisitos)
-3. [Arquitectura del pipeline](#3-arquitectura-del-pipeline)
-4. [Configuración de Jenkins](#4-configuración-de-jenkins)
-5. [Ejecución local (sin Docker)](#5-ejecución-local-sin-docker)
-6. [Ejecución con Docker](#6-ejecución-con-docker)
-7. [Despliegue en Kubernetes (Docker Desktop)](#7-despliegue-en-kubernetes-docker-desktop)
-8. [Endpoints de la aplicación](#8-endpoints-de-la-aplicación)
-9. [Estructura del repositorio](#9-estructura-del-repositorio)
-10. [Variables y configuración](#10-variables-y-configuración)
+- [cicd-demo — Taller CI/CD](#cicd-demo--taller-cicd)
+  - [Tabla de contenido](#tabla-de-contenido)
+  - [1. Descripción del proyecto](#1-descripción-del-proyecto)
+  - [2. Prerrequisitos](#2-prerrequisitos)
+    - [Jenkins en Docker](#jenkins-en-docker)
+    - [Docker Desktop con Kubernetes habilitado](#docker-desktop-con-kubernetes-habilitado)
+  - [3. Arquitectura del pipeline](#3-arquitectura-del-pipeline)
+  - [4. Configuración de Jenkins](#4-configuración-de-jenkins)
+    - [4.1 Crear el job](#41-crear-el-job)
+    - [4.2 Configurar Pipeline script from SCM](#42-configurar-pipeline-script-from-scm)
+    - [4.3 Configurar trigger automático (opcional)](#43-configurar-trigger-automático-opcional)
+    - [4.4 Primera ejecución](#44-primera-ejecución)
+  - [5. Ejecución local (sin Docker)](#5-ejecución-local-sin-docker)
+  - [6. Ejecución con Docker](#6-ejecución-con-docker)
+  - [7. Despliegue en Kubernetes (Docker Desktop)](#7-despliegue-en-kubernetes-docker-desktop)
+    - [7.1 Construir la imagen (requerido antes de desplegar)](#71-construir-la-imagen-requerido-antes-de-desplegar)
+    - [7.2 Aplicar los manifiestos](#72-aplicar-los-manifiestos)
+    - [7.3 Verificar el despliegue](#73-verificar-el-despliegue)
+    - [7.4 Acceder a la aplicación](#74-acceder-a-la-aplicación)
+    - [7.5 Actualizar el despliegue](#75-actualizar-el-despliegue)
+    - [7.6 Limpiar recursos de Kubernetes](#76-limpiar-recursos-de-kubernetes)
+  - [8. Endpoints de la aplicación](#8-endpoints-de-la-aplicación)
+  - [9. Estructura del repositorio](#9-estructura-del-repositorio)
+  - [10. Variables y configuración](#10-variables-y-configuración)
+    - [Variables del Jenkinsfile](#variables-del-jenkinsfile)
+    - [Categorías de tests (JUnit `@Category`)](#categorías-de-tests-junit-category)
+    - [Recursos Kubernetes](#recursos-kubernetes)
 
 ---
 
@@ -48,6 +65,23 @@ docker run -p 8080:8080 -p 50000:50000 \
 ```
 
 > **Importante:** montar `/var/run/docker.sock` le da a Jenkins acceso al daemon Docker del host, necesario para que el pipeline ejecute `docker build` y `docker run`.
+
+**Configuración adicional del contenedor Jenkins (una sola vez):**
+
+Instalar el Docker CLI dentro del contenedor (el socket solo es el canal, el CLI es el binario que ejecuta los comandos):
+
+```bash
+docker exec -u root <id-contenedor> apt-get update && \
+docker exec -u root <id-contenedor> apt-get install -y docker.io
+```
+
+Dar permisos al socket para que el usuario `jenkins` pueda usarlo:
+
+```bash
+docker exec -u root <id-contenedor> chmod 666 /var/run/docker.sock
+```
+
+> **Nota:** el `chmod 666` se pierde si el contenedor se reinicia. Para que sea permanente, agregar esta línea al arrancar Jenkins o usar una imagen personalizada.
 
 **Plugins requeridos** (instalar desde *Manage Jenkins > Plugin Manager*):
 
@@ -94,14 +128,14 @@ El pipeline está definido en `Jenkinsfile` con **5 etapas**:
 | **Build** | `./mvnw clean package -DskipTests` | Compila y genera el JAR sin ejecutar tests |
 | **Test** | `./mvnw test -Dgroups=UnitTest` | Ejecuta pruebas unitarias (sin Spring context) |
 | **Docker Build** | `docker build -t cicd-demo:latest .` | Construye la imagen Docker de la aplicación |
-| **Deploy** | `docker run -d -p 8080:8080 cicd-demo:latest` | Despliega el contenedor *(solo en rama master)* |
+| **Deploy** | `docker run -d -p 8081:8080 cicd-demo:latest` | Despliega el contenedor *(solo en rama master)* |
 
 **Bloque `post`:**
 
 ```
-always  → archiveArtifacts (JAR) + cleanWs()
-success → mensaje de éxito
-failure → mensaje de fallo con indicación de revisar logs
+always  => archiveArtifacts (JAR) + cleanWs()
+success => mensaje de éxito
+failure => mensaje de fallo con indicación de revisar logs
 ```
 
 ---
@@ -186,13 +220,13 @@ docker build -t cicd-demo:latest .
 # 3. Ejecutar el contenedor
 docker run -d \
   --name cicd-demo \
-  -p 8080:8080 \
+  -p 8081:8080 \
   --restart unless-stopped \
   cicd-demo:latest
 
 # 4. Verificar que está corriendo
 docker ps
-curl http://localhost:8080/actuator/health
+curl http://localhost:8081/actuator/health
 
 # 5. Ver logs del contenedor
 docker logs cicd-demo
