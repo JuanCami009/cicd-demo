@@ -1,5 +1,5 @@
 # ============================================================
-# Kubernetes Deployment — cicd-demo
+# Kubernetes Deployment - cicd-demo
 #
 # Despliega la aplicación Spring Boot como un Pod gestionado
 # por un Deployment (garantiza re-inicio automático ante fallos).

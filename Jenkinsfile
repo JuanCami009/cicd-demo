@@ -1,16 +1,16 @@
 #!/usr/bin/env groovy
 
 // ============================================================
-// Pipeline CI/CD — Punto 2 del Taller
+// Pipeline CI/CD - Punto 2 del Taller
 //
 // Etapas:
-//   1. Checkout              — obtiene el código fuente desde el SCM
-//   2. Build                 — compila el proyecto con Maven
-//   3. Test                  — ejecuta las pruebas unitarias
-//   4. Static Analysis       — análisis estático con SonarQube + quality gate
-//   5. Docker Build          — construye la imagen Docker de la aplicación
-//   6. Security Scan (Trivy) — escaneo de vulnerabilidades en la imagen
-//   7. Deploy                — despliega el contenedor (sólo en rama master)
+//   1. Checkout              - obtiene el código fuente desde el SCM
+//   2. Build                 - compila el proyecto con Maven
+//   3. Test                  - ejecuta las pruebas unitarias
+//   4. Static Analysis       - análisis estático con SonarQube + quality gate
+//   5. Docker Build          - construye la imagen Docker de la aplicación
+//   6. Security Scan (Trivy) - escaneo de vulnerabilidades en la imagen
+//   7. Deploy                - despliega el contenedor (sólo en rama master)
 //
 // Prerequisitos en Jenkins (una sola vez):
 //   - docker exec -u root <jenkins_id> apt-get install -y jq
@@ -247,7 +247,7 @@ Ver en: ${SONAR_URL}/security_hotspots?id=${SONAR_PROJECT_KEY}"""
                 script {
                     echo "==> Ejecutando escaneo de seguridad Trivy en: ${IMAGE_TAG}..."
 
-                    // Reporte completo — no falla el pipeline, se archiva como artefacto
+                    // Reporte completo - no falla el pipeline, se archiva como artefacto
                     sh """
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \

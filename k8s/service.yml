@@ -1,5 +1,5 @@
 # ============================================================
-# Kubernetes Service — cicd-demo (NodePort)
+# Kubernetes Service - cicd-demo (NodePort)
 #
 # Expone el Deployment 'cicd-demo' fuera del cluster mediante
 # un NodePort, permitiendo acceder a la aplicación desde el
