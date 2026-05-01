@@ -32,6 +32,9 @@ Aplicación Spring Boot 2.1 usada como base para el ejercicio de diseño y const
     - [Variables del Jenkinsfile](#variables-del-jenkinsfile)
     - [Categorías de tests (JUnit `@Category`)](#categorías-de-tests-junit-category)
     - [Recursos Kubernetes](#recursos-kubernetes)
+  - [11. Análisis de calidad y seguridad](#11-análisis-de-calidad-y-seguridad)
+    - [11.1 SonarQube](#111-sonarqube)
+    - [11.2 Trivy](#112-trivy)
 
 ---
 
@@ -82,6 +85,30 @@ docker exec -u root <id-contenedor> chmod 666 /var/run/docker.sock
 
 > **Nota:** el `chmod 666` se pierde si el contenedor se reinicia. Para que sea permanente, agregar esta línea al arrancar Jenkins o usar una imagen personalizada.
 
+### SonarQube y herramientas de análisis
+
+Instalar `jq` en el contenedor Jenkins (necesario para parsear las respuestas JSON de la API SonarQube):
+
+```bash
+docker exec -u root <id-contenedor> apt-get install -y jq
+```
+
+Iniciar SonarQube como contenedor Docker en el host (una sola vez):
+
+```bash
+docker run -d \
+  --name sonarqube \
+  -p 9001:9000 \
+  -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true \
+  sonarqube:community
+```
+
+Acceder a `http://localhost:9001` y hacer login con `admin/admin`. Si el sistema solicita cambiar la contraseña, actualizar el valor de `SONAR_TOKEN` en el `Jenkinsfile`.
+
+> **Nota:** SonarQube tarda entre 60 y 90 segundos en arrancar la primera vez mientras inicializa su base de datos interna.
+
+<!-- CAPTURA: screenshot de http://localhost:9000 mostrando la pantalla de login de SonarQube -->
+
 **Plugins requeridos** (instalar desde *Manage Jenkins > Plugin Manager*):
 
 | Plugin | Uso |
@@ -110,29 +137,33 @@ kubectl cluster-info
 
 ## 3. Arquitectura del pipeline
 
-El pipeline está definido en `Jenkinsfile` con **5 etapas**:
+El pipeline está definido en `Jenkinsfile` con **7 etapas**:
 
 ```
-┌──────────┐    ┌────────┐    ┌────────┐    ┌──────────────┐    ┌────────┐
-│ Checkout │───>│ Build  │───>│  Test  │───>│ Docker Build │───>│ Deploy │
-│  (SCM)   │    │ (Maven)│    │(JUnit) │    │  (imagen)    │    │(master)│
-└──────────┘    └────────┘    └────────┘    └──────────────┘    └────────┘
-                                                                      │
-                                                              solo rama master
+┌──────────┐   ┌────────┐   ┌────────┐   ┌───────────┐   ┌──────────────┐   ┌──────────────┐   ┌────────┐
+│ Checkout │──>│ Build  │──>│  Test  │──>│ SonarQube │──>│ Docker Build │──>│ Trivy  Scan  │──>│ Deploy │
+│  (SCM)   │   │ (Maven)│   │(JUnit) │   │ (hotspots)│   │  (imagen)    │   │  (CRITICAL)  │   │(master)│
+└──────────┘   └────────┘   └────────┘   └───────────┘   └──────────────┘   └──────────────┘   └────────┘
+                                                                                                      │
+                                                                                              solo rama master
 ```
 
-| Etapa | Comando | Descripción |
+<!-- CAPTURA: screenshot de Jenkins Stage View mostrando los 7 stages en verde -->
+
+| Etapa | Comando / Herramienta | Descripción |
 |---|---|---|
 | **Checkout** | `checkout scm` | Obtiene el código desde el SCM configurado en Jenkins |
 | **Build** | `./mvnw clean package -DskipTests` | Compila y genera el JAR sin ejecutar tests |
-| **Test** | `./mvnw test -Dgroups=UnitTest` | Ejecuta pruebas unitarias (sin Spring context) |
+| **Test** | `./mvnw test -Dgroups=UnitTest` | Ejecuta pruebas unitarias; JaCoCo genera cobertura |
+| **Static Analysis** | `./mvnw sonar:sonar` + API SonarQube | Análisis estático; falla si hay Security Hotspots sin revisar |
 | **Docker Build** | `docker build -t cicd-demo:latest .` | Construye la imagen Docker de la aplicación |
+| **Security Scan** | `aquasec/trivy:latest image` | Escaneo de vulnerabilidades; falla si detecta CRITICAL |
 | **Deploy** | `docker run -d -p 8081:8080 cicd-demo:latest` | Despliega el contenedor *(solo en rama master)* |
 
 **Bloque `post`:**
 
 ```
-always  => archiveArtifacts (JAR) + cleanWs()
+always  => archiveArtifacts (JAR + trivy-full-report.txt) + cleanWs()
 success => mensaje de éxito
 failure => mensaje de fallo con indicación de revisar logs
 ```
@@ -368,7 +399,7 @@ kubectl delete -f k8s/deployment.yml
 
 ```
 cicd-demo/
-├── Jenkinsfile              # Pipeline CI/CD (Punto 1 del taller)
+├── Jenkinsfile              # Pipeline CI/CD (Punto 2 del taller — 7 stages)
 ├── Dockerfile               # Imagen Docker: eclipse-temurin:21-jre-alpine
 ├── Makefile                 # Targets auxiliares para docker-compose
 ├── docker-compose.yml       # Servicios: builder (Maven), selenium
@@ -377,11 +408,6 @@ cicd-demo/
 ├── k8s/
 │   ├── deployment.yml       # Deployment K8s (1 réplica, health probes)
 │   └── service.yml          # Service NodePort (puerto 30080)
-├── k8s-config/
-│   └── deployment.tmpl.yml  # Template avanzado con envsubst (pipeline producción)
-├── jenkins/
-│   ├── Dockerfile           # Imagen Jenkins personalizada con kubectl
-│   └── *.yml / *.sh         # RBAC y scripts de configuración del cluster
 └── src/
     ├── main/java/.../
     │   ├── controller/      # ApiController, UserController
@@ -403,6 +429,10 @@ cicd-demo/
 |---|---|---|
 | `APP_NAME` | `cicd-demo` | Nombre de la aplicación y del contenedor Docker |
 | `IMAGE_TAG` | `cicd-demo:latest` | Tag completo de la imagen Docker construida |
+| `SONAR_URL` | `http://host.docker.internal:9001` | URL de SonarQube accesible desde el contenedor Jenkins |
+| `SONAR_LOGIN` | `admin` | Usuario de SonarQube |
+| `SONAR_TOKEN` | `admin` | Contraseña o token de SonarQube |
+| `SONAR_PROJECT_KEY` | `cicd-demo` | Identificador del proyecto en SonarQube |
 
 ### Categorías de tests (JUnit `@Category`)
 
@@ -418,3 +448,80 @@ cicd-demo/
 |---|---|---|---|
 | `cicd-demo` | Deployment | — | 8080 |
 | `cicd-demo-svc` | Service (NodePort) | 30080 | 8080 |
+
+---
+
+## 11. Análisis de calidad y seguridad
+
+### 11.1 SonarQube
+
+SonarQube analiza el código fuente en busca de bugs, code smells y **Security Hotspots**. El pipeline falla si detecta algún hotspot en estado `TO_REVIEW`, bloqueando el despliegue hasta que sea revisado y marcado como resuelto o aceptado.
+
+**Acceder al dashboard:**
+
+```
+http://localhost:9001/dashboard?id=cicd-demo
+```
+
+<!-- CAPTURA: screenshot del dashboard de SonarQube mostrando el proyecto cicd-demo con el resultado del análisis -->
+
+**Verificar Security Hotspots via API:**
+
+```bash
+curl -s -u admin:admin \
+  "http://localhost:9001/api/hotspots/search?projectKey=cicd-demo&status=TO_REVIEW" \
+  | jq '.paging.total'
+# Resultado esperado: 0
+```
+
+<!-- CAPTURA: screenshot de la sección Security Hotspots en el dashboard de SonarQube mostrando 0 hotspots pendientes -->
+
+**Ver hotspots pendientes:**
+
+```
+http://localhost:9001/security_hotspots?id=cicd-demo
+```
+
+**Detalle del quality gate en el pipeline:**
+
+El stage `Static Analysis (SonarQube)` ejecuta el siguiente flujo:
+
+1. Lanza `./mvnw sonar:sonar` y obtiene el `ceTaskId` de `target/sonar/report-task.txt`
+2. Hace polling a `/api/ce/task?id=<ceTaskId>` hasta que el análisis termine
+3. Consulta `/api/hotspots/search?projectKey=cicd-demo&status=TO_REVIEW`
+4. Si `paging.total > 0` → falla el pipeline con `error()`
+
+<!-- CAPTURA: screenshot de la consola de Jenkins mostrando el output del stage Static Analysis con "Quality Gate SonarQube: PASSED" -->
+
+---
+
+### 11.2 Trivy
+
+Trivy escanea la imagen Docker en busca de vulnerabilidades conocidas (CVEs) en paquetes del sistema operativo y dependencias. El pipeline falla si detecta alguna vulnerabilidad **CRITICAL**, bloqueando el despliegue.
+
+**Ejecutar manualmente (fuera del pipeline):**
+
+```bash
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy:latest image \
+    --severity LOW,MEDIUM,HIGH,CRITICAL \
+    cicd-demo:latest
+```
+
+<!-- CAPTURA: screenshot del reporte completo de Trivy en la terminal mostrando las vulnerabilidades encontradas por severidad -->
+
+**Reporte archivado en Jenkins:**
+
+Cada ejecución del pipeline genera el artefacto `trivy-full-report.txt` con el reporte completo (todas las severidades) disponible para descarga desde la UI de Jenkins.
+
+<!-- CAPTURA: screenshot de la sección "Last Successful Artifacts" en Jenkins mostrando trivy-full-report.txt -->
+
+**Detalle del quality gate en el pipeline:**
+
+El stage `Security Scan (Trivy)` ejecuta Trivy dos veces:
+
+1. Con `--exit-code 0` para generar `trivy-full-report.txt` (todas las severidades, no falla)
+2. Con `--exit-code 1 --severity CRITICAL` para el quality gate (falla si hay al menos 1 CRITICAL)
+
+<!-- CAPTURA: screenshot de la consola de Jenkins mostrando el output del stage Security Scan con "Quality Gate Trivy: PASSED" -->
