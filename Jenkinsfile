@@ -29,7 +29,7 @@ pipeline {
         // SonarQube: host.docker.internal resuelve al host desde el contenedor Jenkins
         // en Docker Desktop (Windows/Mac). Cambiar si se usa otra red.
         SONAR_URL         = 'http://host.docker.internal:9001'
-        SONAR_TOKEN       = 'sqa_714664ec63a06580124c547d488b5ebda065fe94'
+        SONAR_TOKEN       = 'squ_2ac238e5110241e98c0a2bef5c26b0e75e0f3cc4'
         SONAR_PROJECT_KEY = 'cicd-demo'
     }
 
@@ -203,7 +203,11 @@ pipeline {
 
                     echo "==> Security Hotspots TO_REVIEW: ${hotspotCount}"
 
-                    if (hotspotCount && hotspotCount.toInteger() > 0) {
+                    if (!hotspotCount || hotspotCount == 'null') {
+                        error "No se pudo consultar la API de hotspots. Verifica que el token sea de tipo 'User Token' en SonarQube."
+                    }
+
+                    if (hotspotCount.toInteger() > 0) {
                         error """QUALITY GATE FAILED: SonarQube detectó ${hotspotCount} Security Hotspot(s) sin revisar.
 Ver en: ${SONAR_URL}/security_hotspots?id=${SONAR_PROJECT_KEY}"""
                     }
