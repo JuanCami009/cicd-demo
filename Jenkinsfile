@@ -29,8 +29,7 @@ pipeline {
         // SonarQube: host.docker.internal resuelve al host desde el contenedor Jenkins
         // en Docker Desktop (Windows/Mac). Cambiar si se usa otra red.
         SONAR_URL         = 'http://host.docker.internal:9001'
-        SONAR_LOGIN       = 'admin'
-        SONAR_TOKEN       = 'TallerPipelines123!'
+        SONAR_TOKEN       = 'sqa_714664ec63a06580124c547d488b5ebda065fe94'
         SONAR_PROJECT_KEY = 'cicd-demo'
     }
 
@@ -138,8 +137,7 @@ pipeline {
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                             -Dsonar.projectName="${APP_NAME}" \
                             -Dsonar.host.url=${SONAR_URL} \
-                            -Dsonar.login=${SONAR_LOGIN} \
-                            -Dsonar.password=${SONAR_TOKEN} \
+                            -Dsonar.token=${SONAR_TOKEN} \
                             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                     """
 
@@ -162,7 +160,7 @@ pipeline {
                         waitUntil {
                             def taskJson = sh(
                                 script: """
-                                    curl -s -u "${SONAR_LOGIN}:${SONAR_TOKEN}" \
+                                    curl -s -H "Authorization: Bearer ${SONAR_TOKEN}" \
                                         "${SONAR_URL}/api/ce/task?id=${ceTaskId}"
                                 """,
                                 returnStdout: true
@@ -192,7 +190,7 @@ pipeline {
                     echo "==> Consultando Security Hotspots..."
                     def hotspotsJson = sh(
                         script: """
-                            curl -s -u "${SONAR_LOGIN}:${SONAR_TOKEN}" \
+                            curl -s -H "Authorization: Bearer ${SONAR_TOKEN}" \
                                 "${SONAR_URL}/api/hotspots/search?projectKey=${SONAR_PROJECT_KEY}&status=TO_REVIEW"
                         """,
                         returnStdout: true

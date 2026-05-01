@@ -430,8 +430,7 @@ cicd-demo/
 | `APP_NAME` | `cicd-demo` | Nombre de la aplicación y del contenedor Docker |
 | `IMAGE_TAG` | `cicd-demo:latest` | Tag completo de la imagen Docker construida |
 | `SONAR_URL` | `http://host.docker.internal:9001` | URL de SonarQube accesible desde el contenedor Jenkins |
-| `SONAR_LOGIN` | `admin` | Usuario de SonarQube |
-| `SONAR_TOKEN` | `admin` | Contraseña o token de SonarQube |
+| `SONAR_TOKEN` | `sqa_...` | Token de autenticación generado en SonarQube (My Account → Security) |
 | `SONAR_PROJECT_KEY` | `cicd-demo` | Identificador del proyecto en SonarQube |
 
 ### Categorías de tests (JUnit `@Category`)
