@@ -262,7 +262,8 @@ Ver en: ${SONAR_URL}/security_hotspots?id=${SONAR_PROJECT_KEY}"""
                             | tee trivy-full-report.txt || true
                     """
 
-                    // Quality gate: falla si hay vulnerabilidades CRITICAL
+                    // Quality gate: falla si hay vulnerabilidades CRITICAL con fix disponible.
+                    // --ignore-unfixed excluye CVEs sin parche publicado (no accionables).
                     def trivyExitCode = sh(
                         script: """
                             docker run --rm \
@@ -271,6 +272,7 @@ Ver en: ${SONAR_URL}/security_hotspots?id=${SONAR_PROJECT_KEY}"""
                                 aquasec/trivy:latest image \
                                     --exit-code 1 \
                                     --severity CRITICAL \
+                                    --ignore-unfixed \
                                     --scanners vuln \
                                     --timeout 10m \
                                     --quiet \
@@ -280,7 +282,7 @@ Ver en: ${SONAR_URL}/security_hotspots?id=${SONAR_PROJECT_KEY}"""
                     )
 
                     if (trivyExitCode == 1) {
-                        error """QUALITY GATE FAILED: Trivy detectó vulnerabilidades CRITICAL en ${IMAGE_TAG}.
+                        error """QUALITY GATE FAILED: Trivy detectó vulnerabilidades CRITICAL con fix disponible en ${IMAGE_TAG}.
 Revisar el artefacto trivy-full-report.txt para el detalle completo."""
                     } else if (trivyExitCode != 0) {
                         error "Trivy finalizó con código inesperado: ${trivyExitCode}"
